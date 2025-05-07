@@ -1,0 +1,133 @@
+openapi: 3.1.0
+info:
+  title: Scoreboard CRUD Practice
+  version: 1.0.0
+paths:
+  /api/scoreboards:
+    get:
+      operationId: ScoreboardController_list
+      description: List all scoreboards
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Scoreboard'
+      tags:
+        - Scoreboards
+    post:
+      operationId: ScoreboardController_createScoreboard
+      description: Create a scoreboard
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ScoreboardRequest'
+      responses:
+        '200':
+          description: The scoreboard was created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Scoreboard'
+      tags:
+        - Scoreboards
+  /api/scoreboards/{id}:
+    get:
+      operationId: ScoreboardController_read
+      description: Get a scoreboard by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            $ref: '#/components/schemas/uuid'
+      responses:
+        '200':
+          description: Scoreboard found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Scoreboard'
+        '404':
+          description: Scoreboard not found.
+      tags:
+        - Scoreboards
+    put:
+      operationId: ScoreboardController_updateScoreboard
+      description: Update a scoreboard by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            $ref: '#/components/schemas/uuid'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ScoreboardRequest'
+      responses:
+        '200':
+          description: Scoreboard updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Scoreboard'
+        '404':
+          description: Scoreboard not found.
+      tags:
+        - Scoreboards
+    delete:
+      operationId: ScoreboardController_delete
+      description: Delete a scoreboard by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            $ref: '#/components/schemas/uuid'
+      responses:
+        '204':
+          description: Scoreboard deleted.
+        '404':
+          description: Scoreboard not found.
+      tags:
+        - Scoreboards
+components:
+  schemas:
+    Scoreboard:
+      type: object
+      required:
+        - id
+        - name
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          $ref: '#/components/schemas/uuid'
+        name:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    ScoreboardRequest:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          examples:
+            - My Scoreboard
+    uuid:
+      type: string
+      format: uuid
