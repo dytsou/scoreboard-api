@@ -53,7 +53,9 @@ func (s Service) Get(ctx context.Context, id uuid.UUID) (Scoreboard, error) {
 }
 
 func (s Service) Create(ctx context.Context, name string) (Scoreboard, error) {
-	createdScoreboard, err := s.query.Create(ctx, name)
+	traceCtx, span := s.tracer.Start(ctx, "Create")
+	defer span.End()
+	createdScoreboard, err := s.query.Create(traceCtx, name)
 	if err != nil {
 		return Scoreboard{}, err
 	}
