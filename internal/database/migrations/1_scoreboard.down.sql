@@ -1,3 +1,1 @@
-CREATE EXTENSION IF NOT EXISTS "pgcrypto";
-
 DROP TABLE scoreboards;
