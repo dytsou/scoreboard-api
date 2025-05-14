@@ -46,8 +46,9 @@ func (h Handler) ListHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	json.NewEncoder(w).Encode(scoreboards)
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(scoreboards)
 }
 
 func (h Handler) CreateHandler(w http.ResponseWriter, r *http.Request) {
