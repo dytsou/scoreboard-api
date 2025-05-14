@@ -78,7 +78,19 @@ func (h Handler) CreateHandler(w http.ResponseWriter, r *http.Request) {
 
 func (h Handler) GetHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	idStr := r.FormValue("id")
+	// Extract ID from URL path
+	path := r.URL.Path
+	// Remove trailing slash if present
+	if path[len(path)-1] == '/' {
+		path = path[:len(path)-1]
+	}
+	// Get the last segment of the path
+	segments := strings.Split(path, "/")
+	if len(segments) < 1 {
+		http.Error(w, "Invalid path for ID extraction", http.StatusBadRequest)
+		return
+	}
+	idStr := segments[len(segments)-1]
 
 	id, err := uuid.Parse(idStr)
 	if err != nil {
