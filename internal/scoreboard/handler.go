@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"regexp"
 	"strings"
 
 	"github.com/google/uuid"
@@ -39,6 +40,25 @@ func NewHandler(logger *zap.Logger, s Store) Handler {
 	}
 }
 
+// validateName checks if the name meets requirements.
+// Returns true with empty string if valid, false with error message if invalid.
+func validateName(name string) (bool, string) {
+	if name == "" {
+		return false, "Name cannot be empty"
+	}
+
+	if len(name) > 255 {
+		return false, "Name cannot exceed 255 characters"
+	}
+
+	validNamePattern := regexp.MustCompile(`^[a-zA-Z0-9\-_ ]+$`)
+	if !validNamePattern.MatchString(name) {
+		return false, "Name can only contain alphanumeric characters, hyphens, underscores, and spaces"
+	}
+
+	return true, ""
+}
+
 func (h Handler) ListHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	scoreboards, err := h.store.List(ctx)
@@ -61,8 +81,8 @@ func (h Handler) CreateHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	defer r.Body.Close()
 
-	if payload.Name == "" {
-		http.Error(w, "Name is required", http.StatusBadRequest)
+	if valid, errMsg := validateName(payload.Name); !valid {
+		http.Error(w, errMsg, http.StatusBadRequest)
 		return
 	}
 
@@ -72,7 +92,7 @@ func (h Handler) CreateHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
+	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(scoreboard)
 }
 
@@ -136,6 +156,11 @@ func (h Handler) UpdateHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer r.Body.Close()
+
+	if valid, errMsg := validateName(payload.Name); !valid {
+		http.Error(w, errMsg, http.StatusBadRequest)
+		return
+	}
 
 	scoreboard, err := h.store.Update(ctx, UpdateParams{
 		ID:   id,
