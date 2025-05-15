@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"github.com/jackc/pgx/v5/pgtype"
+	"io"
 	"net/http"
 	"regexp"
 	"strings"
@@ -88,7 +89,12 @@ func (h Handler) CreateHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
-	defer r.Body.Close()
+	defer func(Body io.ReadCloser) {
+		err := Body.Close()
+		if err != nil {
+
+		}
+	}(r.Body)
 
 	if valid, errMsg := validateName(payload.Name); !valid {
 		http.Error(w, errMsg, http.StatusBadRequest)
@@ -106,9 +112,9 @@ func (h Handler) CreateHandler(w http.ResponseWriter, r *http.Request) {
 
 func (h Handler) GetHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	// Extract ID from URL path
+	// Extract ID from the URL path
 	path := r.URL.Path
-	// Remove trailing slash if present
+	// Remove the trailing slash if present
 	if path[len(path)-1] == '/' {
 		path = path[:len(path)-1]
 	}
@@ -137,9 +143,9 @@ func (h Handler) GetHandler(w http.ResponseWriter, r *http.Request) {
 func (h Handler) UpdateHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	// Extract ID from URL path
+	// Extract ID from the URL path
 	path := r.URL.Path
-	// Remove trailing slash if present
+	// Remove the trailing slash if present
 	if path[len(path)-1] == '/' {
 		path = path[:len(path)-1]
 	}
@@ -162,7 +168,12 @@ func (h Handler) UpdateHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
-	defer r.Body.Close()
+	defer func(Body io.ReadCloser) {
+		err := Body.Close()
+		if err != nil {
+
+		}
+	}(r.Body)
 
 	if valid, errMsg := validateName(payload.Name); !valid {
 		http.Error(w, errMsg, http.StatusBadRequest)
@@ -187,9 +198,9 @@ func (h Handler) UpdateHandler(w http.ResponseWriter, r *http.Request) {
 func (h Handler) DeleteHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	// Extract ID from URL path
+	// Extract ID from the URL path
 	path := r.URL.Path
-	// Remove trailing slash if present
+	// Remove the trailing slash if present
 	if path[len(path)-1] == '/' {
 		path = path[:len(path)-1]
 	}
