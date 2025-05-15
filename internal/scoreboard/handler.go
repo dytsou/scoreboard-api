@@ -40,17 +40,13 @@ func NewHandler(logger *zap.Logger, s Store) Handler {
 	}
 }
 
-// validateName checks if the name meets requirements.
-// Returns true with empty string if valid, false with error message if invalid.
 func validateName(name string) (bool, string) {
 	if name == "" {
 		return false, "Name cannot be empty"
 	}
-
 	if len(name) > 255 {
 		return false, "Name cannot exceed 255 characters"
 	}
-
 	validNamePattern := regexp.MustCompile(`^[a-zA-Z0-9\-_ ]+$`)
 	if !validNamePattern.MatchString(name) {
 		return false, "Name can only contain alphanumeric characters, hyphens, underscores, and spaces"
@@ -92,7 +88,7 @@ func (h Handler) CreateHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
+	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(scoreboard)
 }
 
