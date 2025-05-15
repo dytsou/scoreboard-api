@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"go.opentelemetry.io/otel"
@@ -24,6 +25,13 @@ type Store interface {
 // CreateScoreboardPayload defines the expected request body for creating a scoreboard.
 type CreateScoreboardPayload struct {
 	Name string `json:"name"`
+}
+
+type Response struct {
+	ID        string `json:"id"`
+	Name      string `json:"name"`
+	CreatedAt string `json:"createdAt"`
+	UpdatedAt string `json:"updatedAt"`
 }
 
 type Handler struct {
@@ -64,7 +72,11 @@ func (h Handler) ListHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(scoreboards)
+	response := make([]Response, len(scoreboards))
+	for index, post := range scoreboards {
+		response[index] = GenerateResponse(post)
+	}
+	WriteJSONResponse(w, http.StatusOK, response)
 }
 
 func (h Handler) CreateHandler(w http.ResponseWriter, r *http.Request) {
@@ -87,9 +99,8 @@ func (h Handler) CreateHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(scoreboard)
+	response := GenerateResponse(scoreboard)
+	WriteJSONResponse(w, http.StatusOK, response)
 }
 
 func (h Handler) GetHandler(w http.ResponseWriter, r *http.Request) {
@@ -118,9 +129,8 @@ func (h Handler) GetHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(scoreboard)
+	response := GenerateResponse(scoreboard)
+	WriteJSONResponse(w, http.StatusOK, response)
 }
 
 func (h Handler) UpdateHandler(w http.ResponseWriter, r *http.Request) {
@@ -166,10 +176,8 @@ func (h Handler) UpdateHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(scoreboard)
+	response := GenerateResponse(scoreboard)
+	WriteJSONResponse(w, http.StatusOK, response)
 }
 
 func (h Handler) DeleteHandler(w http.ResponseWriter, r *http.Request) {
@@ -201,4 +209,28 @@ func (h Handler) DeleteHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func WriteJSONResponse(w http.ResponseWriter, status int, data interface{}) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	jsonBytes, err := json.Marshal(data)
+	if err != nil {
+		http.Error(w, "Failed to marshal response", http.StatusInternalServerError)
+		return
+	}
+	_, err = w.Write(jsonBytes)
+	if err != nil {
+		http.Error(w, "Failed to write response", http.StatusInternalServerError)
+		return
+	}
+}
+
+func GenerateResponse(scoreboard Scoreboard) Response {
+	return Response{
+		ID:        scoreboard.ID.String(),
+		Name:      scoreboard.Name,
+		CreatedAt: scoreboard.CreatedAt.Time.Format(time.RFC3339),
+		UpdatedAt: scoreboard.UpdatedAt.Time.Format(time.RFC3339),
+	}
 }
