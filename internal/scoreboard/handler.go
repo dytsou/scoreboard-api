@@ -19,7 +19,7 @@ import (
 type Store interface {
 	List(ctx context.Context) ([]Scoreboard, error)
 	Get(ctx context.Context, id uuid.UUID) (Scoreboard, error)
-	Create(ctx context.Context, name string) (Scoreboard, error)
+	Create(ctx context.Context, name pgtype.Text) (Scoreboard, error)
 	Update(ctx context.Context, arg UpdateParams) (Scoreboard, error)
 	Delete(ctx context.Context, id uuid.UUID) error
 }
@@ -82,8 +82,11 @@ func (h Handler) CreateHandler(w http.ResponseWriter, r *http.Request) {
 
 		}
 	}(r.Body)
-
-	scoreboard, err := h.store.Create(ctx, payload.Name)
+	name := pgtype.Text{
+		String: payload.Name,
+		Valid:  payload.Name != "",
+	}
+	scoreboard, err := h.store.Create(ctx, name)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

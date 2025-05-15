@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"scoreboard-api/internal"
 	"scoreboard-api/internal/config"
 	"scoreboard-api/internal/database"
 	"scoreboard-api/internal/scoreboard"
@@ -18,6 +19,7 @@ import (
 func main() {
 	cfg := config.Load()
 	logger, err := zap.NewDevelopment()
+	validator := internal.NewValidator()
 	if err != nil {
 		panic(err)
 	}
@@ -33,7 +35,7 @@ func main() {
 	defer db.Close()
 
 	service := scoreboard.NewService(logger, db)
-	handler := scoreboard.NewHandler(logger, service)
+	handler := scoreboard.NewHandler(validator, logger, service)
 
 	mux := http.NewServeMux()
 
