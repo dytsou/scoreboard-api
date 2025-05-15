@@ -2,6 +2,7 @@ package scoreboard
 
 import (
 	"context"
+	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -19,7 +20,7 @@ type Service struct {
 type Querier interface {
 	List(ctx context.Context) ([]Scoreboard, error)
 	Get(ctx context.Context, id uuid.UUID) (Scoreboard, error)
-	Create(ctx context.Context, name string) (Scoreboard, error)
+	Create(ctx context.Context, name pgtype.Text) (Scoreboard, error)
 	Delete(ctx context.Context, id uuid.UUID) error
 	Update(ctx context.Context, arg UpdateParams) (Scoreboard, error)
 }
@@ -52,7 +53,7 @@ func (s Service) Get(ctx context.Context, id uuid.UUID) (Scoreboard, error) {
 	return scoreboard, nil
 }
 
-func (s Service) Create(ctx context.Context, name string) (Scoreboard, error) {
+func (s Service) Create(ctx context.Context, name pgtype.Text) (Scoreboard, error) {
 	traceCtx, span := s.tracer.Start(ctx, "Create")
 	defer span.End()
 	createdScoreboard, err := s.query.Create(traceCtx, name)

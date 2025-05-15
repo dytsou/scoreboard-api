@@ -3,10 +3,10 @@ package scoreboard
 import (
 	"context"
 	"encoding/json"
+	"github.com/go-playground/validator/v10"
 	"github.com/jackc/pgx/v5/pgtype"
 	"io"
 	"net/http"
-	"regexp"
 	"strings"
 	"time"
 
@@ -30,39 +30,26 @@ type CreateScoreboardPayload struct {
 }
 
 type Response struct {
-	ID        string `json:"id"`
-	Name      string `json:"name"`
-	CreatedAt string `json:"createdAt"`
-	UpdatedAt string `json:"updatedAt"`
+	ID        string `json:"id" validate:"required,uuid4"`
+	Name      string `json:"name" validate:"required, alphanumerspaceunderhyphen"`
+	CreatedAt string `json:"createdAt" validate:"required"`
+	UpdatedAt string `json:"updatedAt" validate:"required"`
 }
 
 type Handler struct {
-	tracer trace.Tracer
-	logger *zap.Logger
-	store  Store
+	validator *validator.Validate
+	tracer    trace.Tracer
+	logger    *zap.Logger
+	store     Store
 }
 
-func NewHandler(logger *zap.Logger, s Store) Handler {
+func NewHandler(v *validator.Validate, logger *zap.Logger, s Store) Handler {
 	return Handler{
-		tracer: otel.Tracer("Scoreboard/handler"),
-		logger: logger,
-		store:  s,
+		validator: v,
+		tracer:    otel.Tracer("Scoreboard/handler"),
+		logger:    logger,
+		store:     s,
 	}
-}
-
-func validateName(name string) (bool, string) {
-	if name == "" {
-		return false, "Name cannot be empty"
-	}
-	if len(name) > 255 {
-		return false, "Name cannot exceed 255 characters"
-	}
-	validNamePattern := regexp.MustCompile(`^[a-zA-Z0-9\-_ ]+$`)
-	if !validNamePattern.MatchString(name) {
-		return false, "Name can only contain alphanumeric characters, hyphens, underscores, and spaces"
-	}
-
-	return true, ""
 }
 
 func (h Handler) ListHandler(w http.ResponseWriter, r *http.Request) {
@@ -95,11 +82,6 @@ func (h Handler) CreateHandler(w http.ResponseWriter, r *http.Request) {
 
 		}
 	}(r.Body)
-
-	if valid, errMsg := validateName(payload.Name); !valid {
-		http.Error(w, errMsg, http.StatusBadRequest)
-		return
-	}
 
 	scoreboard, err := h.store.Create(ctx, payload.Name)
 	if err != nil {
@@ -175,10 +157,6 @@ func (h Handler) UpdateHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}(r.Body)
 
-	if valid, errMsg := validateName(payload.Name); !valid {
-		http.Error(w, errMsg, http.StatusBadRequest)
-		return
-	}
 	name := pgtype.Text{
 		String: payload.Name,
 		Valid:  payload.Name != "",
