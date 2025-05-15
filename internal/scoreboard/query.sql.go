@@ -9,6 +9,7 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const create = `-- name: Create :one
@@ -22,7 +23,7 @@ INSERT INTO scoreboards (
 ) RETURNING id, name, created_at, updated_at
 `
 
-func (q *Queries) Create(ctx context.Context, name string) (Scoreboard, error) {
+func (q *Queries) Create(ctx context.Context, name pgtype.Text) (Scoreboard, error) {
 	row := q.db.QueryRow(ctx, create, name)
 	var i Scoreboard
 	err := row.Scan(
@@ -100,7 +101,7 @@ RETURNING id, name, created_at, updated_at
 
 type UpdateParams struct {
 	ID   uuid.UUID
-	Name string
+	Name pgtype.Text
 }
 
 func (q *Queries) Update(ctx context.Context, arg UpdateParams) (Scoreboard, error) {

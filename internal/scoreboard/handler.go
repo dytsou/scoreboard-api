@@ -3,6 +3,7 @@ package scoreboard
 import (
 	"context"
 	"encoding/json"
+	"github.com/jackc/pgx/v5/pgtype"
 	"net/http"
 	"regexp"
 	"strings"
@@ -167,10 +168,13 @@ func (h Handler) UpdateHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, errMsg, http.StatusBadRequest)
 		return
 	}
-
+	name := pgtype.Text{
+		String: payload.Name,
+		Valid:  payload.Name != "",
+	}
 	scoreboard, err := h.store.Update(ctx, UpdateParams{
 		ID:   id,
-		Name: payload.Name,
+		Name: name,
 	})
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -229,7 +233,7 @@ func WriteJSONResponse(w http.ResponseWriter, status int, data interface{}) {
 func GenerateResponse(scoreboard Scoreboard) Response {
 	return Response{
 		ID:        scoreboard.ID.String(),
-		Name:      scoreboard.Name,
+		Name:      scoreboard.Name.String,
 		CreatedAt: scoreboard.CreatedAt.Time.Format(time.RFC3339),
 		UpdatedAt: scoreboard.UpdatedAt.Time.Format(time.RFC3339),
 	}
