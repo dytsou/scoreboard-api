@@ -3,8 +3,12 @@ package scoreboard
 import (
 	"context"
 	"encoding/json"
+	"github.com/go-playground/validator/v10"
+	"github.com/jackc/pgx/v5/pgtype"
+	"io"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"go.opentelemetry.io/otel"
@@ -25,17 +29,26 @@ type CreateScoreboardPayload struct {
 	Name string `json:"name"`
 }
 
-type Handler struct {
-	tracer trace.Tracer
-	logger *zap.Logger
-	store  Store
+type Response struct {
+	ID        string `json:"id" validate:"required,uuid4"`
+	Name      string `json:"name" validate:"required, alphanumerspaceunderhyphen"`
+	CreatedAt string `json:"createdAt" validate:"required"`
+	UpdatedAt string `json:"updatedAt" validate:"required"`
 }
 
-func NewHandler(logger *zap.Logger, s Store) Handler {
+type Handler struct {
+	validator *validator.Validate
+	tracer    trace.Tracer
+	logger    *zap.Logger
+	store     Store
+}
+
+func NewHandler(v *validator.Validate, logger *zap.Logger, s Store) Handler {
 	return Handler{
-		tracer: otel.Tracer("Scoreboard/handler"),
-		logger: logger,
-		store:  s,
+		validator: v,
+		tracer:    otel.Tracer("Scoreboard/handler"),
+		logger:    logger,
+		store:     s,
 	}
 }
 
@@ -48,7 +61,11 @@ func (h Handler) ListHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(scoreboards)
+	response := make([]Response, len(scoreboards))
+	for index, post := range scoreboards {
+		response[index] = GenerateResponse(post)
+	}
+	WriteJSONResponse(w, http.StatusOK, response)
 }
 
 func (h Handler) CreateHandler(w http.ResponseWriter, r *http.Request) {
@@ -59,28 +76,27 @@ func (h Handler) CreateHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
-	defer r.Body.Close()
+	defer func(Body io.ReadCloser) {
+		err := Body.Close()
+		if err != nil {
 
-	if payload.Name == "" {
-		http.Error(w, "Name is required", http.StatusBadRequest)
-		return
-	}
+		}
+	}(r.Body)
 
 	scoreboard, err := h.store.Create(ctx, payload.Name)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(scoreboard)
+	response := GenerateResponse(scoreboard)
+	WriteJSONResponse(w, http.StatusOK, response)
 }
 
 func (h Handler) GetHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	// Extract ID from URL path
+	// Extract ID from the URL path
 	path := r.URL.Path
-	// Remove trailing slash if present
+	// Remove the trailing slash if present
 	if path[len(path)-1] == '/' {
 		path = path[:len(path)-1]
 	}
@@ -102,17 +118,16 @@ func (h Handler) GetHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(scoreboard)
+	response := GenerateResponse(scoreboard)
+	WriteJSONResponse(w, http.StatusOK, response)
 }
 
 func (h Handler) UpdateHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	// Extract ID from URL path
+	// Extract ID from the URL path
 	path := r.URL.Path
-	// Remove trailing slash if present
+	// Remove the trailing slash if present
 	if path[len(path)-1] == '/' {
 		path = path[:len(path)-1]
 	}
@@ -135,28 +150,35 @@ func (h Handler) UpdateHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
-	defer r.Body.Close()
+	defer func(Body io.ReadCloser) {
+		err := Body.Close()
+		if err != nil {
 
+		}
+	}(r.Body)
+
+	name := pgtype.Text{
+		String: payload.Name,
+		Valid:  payload.Name != "",
+	}
 	scoreboard, err := h.store.Update(ctx, UpdateParams{
 		ID:   id,
-		Name: payload.Name,
+		Name: name,
 	})
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(scoreboard)
+	response := GenerateResponse(scoreboard)
+	WriteJSONResponse(w, http.StatusOK, response)
 }
 
 func (h Handler) DeleteHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	// Extract ID from URL path
+	// Extract ID from the URL path
 	path := r.URL.Path
-	// Remove trailing slash if present
+	// Remove the trailing slash if present
 	if path[len(path)-1] == '/' {
 		path = path[:len(path)-1]
 	}
@@ -180,4 +202,28 @@ func (h Handler) DeleteHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func WriteJSONResponse(w http.ResponseWriter, status int, data interface{}) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	jsonBytes, err := json.Marshal(data)
+	if err != nil {
+		http.Error(w, "Failed to marshal response", http.StatusInternalServerError)
+		return
+	}
+	_, err = w.Write(jsonBytes)
+	if err != nil {
+		http.Error(w, "Failed to write response", http.StatusInternalServerError)
+		return
+	}
+}
+
+func GenerateResponse(scoreboard Scoreboard) Response {
+	return Response{
+		ID:        scoreboard.ID.String(),
+		Name:      scoreboard.Name.String,
+		CreatedAt: scoreboard.CreatedAt.Time.Format(time.RFC3339),
+		UpdatedAt: scoreboard.UpdatedAt.Time.Format(time.RFC3339),
+	}
 }

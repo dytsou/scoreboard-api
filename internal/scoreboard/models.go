@@ -11,7 +11,7 @@ import (
 
 type Scoreboard struct {
 	ID        uuid.UUID
-	Name      string
+	Name      pgtype.Text
 	CreatedAt pgtype.Timestamp
 	UpdatedAt pgtype.Timestamp
 }
