@@ -1,1 +1,23 @@
-internal/config/
+# Binary files (executables in root directory)
+/main
+/oauth
+/scoreboard
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binary, built with `go test -c`
+*.test
+
+# Output of the go coverage tool
+*.out
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# But allow .env.example
+!.env.example
