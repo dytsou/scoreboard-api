@@ -9,10 +9,27 @@ import (
 	"net/http"
 	"net/url"
 
+	"github.com/jackc/pgx/v5/pgxpool"
 	"go.uber.org/zap"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
+
+	"scoreboard-api/internal/user"
 )
+
+type Handler struct {
+	logger      *zap.Logger
+	userService *user.Service
+	oauthConfig *oauth2.Config
+}
+
+func NewHandler(logger *zap.Logger, userService *user.Service, oauthConfig *oauth2.Config) *Handler {
+	return &Handler{
+		logger:      logger,
+		userService: userService,
+		oauthConfig: oauthConfig,
+	}
+}
 
 func main() {
 	logger, err := zap.NewDevelopment()
@@ -22,12 +39,30 @@ func main() {
 
 	logger.Info("hello world", zap.String("hello", "world"))
 
-	mux := http.NewServeMux()
-	mux.HandleFunc("/healthz", healthz)
+	dbpool, err := pgxpool.New(context.Background(), "postgres://postgres:postgres@localhost:5432/postgres")
+	if err != nil {
+		panic(err)
+	}
+	defer dbpool.Close()
 
-	mux.HandleFunc("GET /api/login/oauth/google", oauth2Start)
-	mux.HandleFunc("GET /api/oauth/google/callback", oauth2Callback)
-	mux.HandleFunc("GET /frontend", frontend)
+	userService := user.NewService(logger, dbpool)
+	oauthConfig := &oauth2.Config{
+		ClientID:     "883905598480-anv2pnkpl684u7g1hv5rh4b508qqfhb8.apps.googleusercontent.com",
+		ClientSecret: "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",
+		RedirectURL:  "http://localhost:8080/api/oauth/google/callback",
+		Scopes: []string{
+			"https://www.googleapis.com/auth/userinfo.email",
+			"https://www.googleapis.com/auth/userinfo.profile",
+		},
+		Endpoint: google.Endpoint,
+	}
+	handler := NewHandler(logger, userService, oauthConfig)
+	mux := http.NewServeMux()
+	mux.HandleFunc("/healthz", handler.healthz)
+
+	mux.HandleFunc("GET /api/login/oauth/google", handler.oauth2Start)
+	mux.HandleFunc("GET /api/oauth/google/callback", handler.oauth2Callback)
+	mux.HandleFunc("GET /frontend", handler.frontend)
 
 	err = http.ListenAndServe(":8080", mux)
 	if err != nil {
@@ -36,12 +71,12 @@ func main() {
 	}
 }
 
-func healthz(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) healthz(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusAccepted)
 	w.Header().Set("Content-Type", "application/json")
 }
 
-func oauth2Start(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) oauth2Start(w http.ResponseWriter, r *http.Request) {
 	// Placeholder for OAuth2 start logic
 	callback := r.URL.Query().Get("c")
 	redirectTo := r.URL.Query().Get("r")
@@ -54,22 +89,11 @@ func oauth2Start(w http.ResponseWriter, r *http.Request) {
 
 	state := base64.StdEncoding.EncodeToString([]byte(callback))
 
-	config := &oauth2.Config{
-		ClientID:     "883905598480-anv2pnkpl684u7g1hv5rh4b508qqfhb8.apps.googleusercontent.com",
-		ClientSecret: "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",
-		RedirectURL:  "http://localhost:8080/api/oauth/google/callback",
-		Scopes: []string{
-			"https://www.googleapis.com/auth/userinfo.email",
-			"https://www.googleapis.com/auth/userinfo.profile",
-		},
-		Endpoint: google.Endpoint,
-	}
-
-	authURL := config.AuthCodeURL(state, oauth2.AccessTypeOffline)
+	authURL := h.oauthConfig.AuthCodeURL(state, oauth2.AccessTypeOffline)
 	http.Redirect(w, r, authURL, http.StatusTemporaryRedirect)
 }
 
-func oauth2Callback(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) oauth2Callback(w http.ResponseWriter, r *http.Request) {
 	code := r.URL.Query().Get("code")
 	state := r.URL.Query().Get("state")
 	oauthError := r.URL.Query().Get("error") // Check if there was an error during the OAuth2 process
@@ -94,28 +118,35 @@ func oauth2Callback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	config := &oauth2.Config{
-		ClientID:     "883905598480-anv2pnkpl684u7g1hv5rh4b508qqfhb8.apps.googleusercontent.com",
-		ClientSecret: "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",
-		RedirectURL:  "http://localhost:8080/api/oauth/google/callback",
-		Scopes: []string{
-			"https://www.googleapis.com/auth/userinfo.email",
-			"https://www.googleapis.com/auth/userinfo.profile",
-		},
-		Endpoint: google.Endpoint,
-	}
-
-	token, err := config.Exchange(r.Context(), code)
+	token, err := h.oauthConfig.Exchange(r.Context(), code)
 	if err != nil {
 		http.Redirect(w, r, fmt.Sprintf("%s?error=%s", callback, err.Error()), http.StatusTemporaryRedirect)
 	}
 
-	userInfo, err := getUserInfo(config, token)
+	userInfo, err := getUserInfo(h.oauthConfig, token)
 	if err != nil {
 		http.Redirect(w, r, fmt.Sprintf("%s?error=%s", callback, err.Error()), http.StatusTemporaryRedirect)
 	}
 
-	userInfoJSON, err := json.Marshal(userInfo)
+	dbUser, err := h.userService.FindOrCreateWithProfile(r.Context(), 
+		userInfo.Email,
+		userInfo.Name,
+		userInfo.GivenName,
+		userInfo.FamilyName,
+		userInfo.Picture,
+		userInfo.Locale,
+		userInfo.EmailVerified,
+	)
+	if err != nil {
+		h.logger.Error("Failed to find or create user", zap.Error(err))
+		http.Redirect(w, r, fmt.Sprintf("%s?error=%s", callback, err.Error()), http.StatusTemporaryRedirect)
+		return
+	}
+
+	userInfoJSON, err := json.Marshal(map[string]interface{}{
+		"user":   userInfo,
+		"dbUser": dbUser,
+	})
 	if err != nil {
 		http.Redirect(w, r, fmt.Sprintf("%s?error=%s", callback, err.Error()), http.StatusTemporaryRedirect)
 	}
@@ -165,7 +196,7 @@ func getUserInfo(config *oauth2.Config, token *oauth2.Token) (googleUserInfo, er
 	return userInfo, nil
 }
 
-func frontend(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) frontend(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 
 	page := `
