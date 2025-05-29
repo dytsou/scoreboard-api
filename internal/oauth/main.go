@@ -6,14 +6,17 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/url"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/joho/godotenv"
 	"go.uber.org/zap"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 
+	"scoreboard-api/internal/config"
 	"scoreboard-api/internal/user"
 )
 
@@ -32,6 +35,14 @@ func NewHandler(logger *zap.Logger, userService *user.Service, oauthConfig *oaut
 }
 
 func main() {
+	// Load .env file
+	if err := godotenv.Load(); err != nil {
+		log.Println("No .env file found or error loading .env file")
+	}
+
+	// Load configuration
+	cfg := config.Load()
+
 	logger, err := zap.NewDevelopment()
 	if err != nil {
 		panic(err)
@@ -39,7 +50,7 @@ func main() {
 
 	logger.Info("hello world", zap.String("hello", "world"))
 
-	dbpool, err := pgxpool.New(context.Background(), "postgres://postgres:postgres@localhost:5432/postgres")
+	dbpool, err := pgxpool.New(context.Background(), cfg.DatabaseURL)
 	if err != nil {
 		panic(err)
 	}
@@ -47,9 +58,9 @@ func main() {
 
 	userService := user.NewService(logger, dbpool)
 	oauthConfig := &oauth2.Config{
-		ClientID:     "883905598480-anv2pnkpl684u7g1hv5rh4b508qqfhb8.apps.googleusercontent.com",
-		ClientSecret: "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",
-		RedirectURL:  "http://localhost:8080/api/oauth/google/callback",
+		ClientID:     cfg.GoogleOauthClientID,
+		ClientSecret: cfg.GoogleOauthClientSecret,
+		RedirectURL:  fmt.Sprintf("%s/api/oauth/google/callback", cfg.BaseURL),
 		Scopes: []string{
 			"https://www.googleapis.com/auth/userinfo.email",
 			"https://www.googleapis.com/auth/userinfo.profile",
@@ -64,7 +75,8 @@ func main() {
 	mux.HandleFunc("GET /api/oauth/google/callback", handler.oauth2Callback)
 	mux.HandleFunc("GET /frontend", handler.frontend)
 
-	err = http.ListenAndServe(":8080", mux)
+	serverAddr := fmt.Sprintf("%s:%s", cfg.Host, cfg.Port)
+	err = http.ListenAndServe(serverAddr, mux)
 	if err != nil {
 		logger.Error("Failed to start server", zap.Error(err))
 		return
