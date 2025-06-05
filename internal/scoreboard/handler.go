@@ -27,7 +27,7 @@ type Store interface {
 
 // CreateScoreboardPayload defines the expected request body for creating a scoreboard.
 type CreateScoreboardPayload struct {
-	Name string `json:"name" validate:"required,Alphanumerspaceunderhyphen"`
+	Name string `json:"name" validate:"required,Alphanumericspaceunderhyphen"`
 }
 
 type Response struct {
