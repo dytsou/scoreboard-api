@@ -3,12 +3,13 @@ package scoreboard
 import (
 	"context"
 	"encoding/json"
-	"github.com/go-playground/validator/v10"
-	"github.com/jackc/pgx/v5/pgtype"
 	"io"
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/go-playground/validator/v10"
+	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/google/uuid"
 	"go.opentelemetry.io/otel"
@@ -26,12 +27,12 @@ type Store interface {
 
 // CreateScoreboardPayload defines the expected request body for creating a scoreboard.
 type CreateScoreboardPayload struct {
-	Name string `json:"name"`
+	Name string `json:"name" validate:"required,Alphanumerspaceunderhyphen"`
 }
 
 type Response struct {
 	ID        string `json:"id" validate:"required,uuid4"`
-	Name      string `json:"name" validate:"required, alphanumerspaceunderhyphen"`
+	Name      string `json:"name" validate:"required"`
 	CreatedAt string `json:"createdAt" validate:"required"`
 	UpdatedAt string `json:"updatedAt" validate:"required"`
 }

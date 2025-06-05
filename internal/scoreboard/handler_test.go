@@ -3,14 +3,16 @@ package scoreboard
 import (
 	"strings"
 	"testing"
+
+	"scoreboard-api/internal"
 )
 
 func TestValidateName(t *testing.T) {
 	tests := []struct {
-		name        string
-		input       string
-		wantValid   bool
-		wantErrMsg  string
+		name       string
+		input      string
+		wantValid  bool
+		wantErrMsg string
 	}{
 		{
 			name:       "Valid name with alphanumeric",
@@ -58,12 +60,11 @@ func TestValidateName(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gotValid, gotErrMsg := validateName(tt.input)
-			if gotValid != tt.wantValid {
-				t.Errorf("validateName() gotValid = %v, want %v", gotValid, tt.wantValid)
-			}
-			if gotErrMsg != tt.wantErrMsg {
-				t.Errorf("validateName() gotErrMsg = %v, want %v", gotErrMsg, tt.wantErrMsg)
+			validate := internal.NewValidator()
+			internal.RegisterCustomValidations(validate)
+			nameData := CreateScoreboardPayload{Name: tt.input}
+			if err := internal.ValidateStruct(validate, nameData); err != nil {
+				t.Errorf("validateName() gotErrMsg = %v, want %v", err, tt.wantErrMsg)
 			}
 		})
 	}
