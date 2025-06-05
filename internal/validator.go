@@ -1,8 +1,9 @@
 package internal
 
 import (
-	"github.com/go-playground/validator/v10"
 	"regexp"
+
+	"github.com/go-playground/validator/v10"
 )
 
 func NewValidator() *validator.Validate {
@@ -17,10 +18,10 @@ func ValidateStruct(v *validator.Validate, s interface{}) error {
 	return nil
 }
 func RegisterCustomValidations(validate *validator.Validate) {
-	validate.RegisterValidation("alphanumerspaceunderhyphen", alphanumerspaceunderhyphen)
+	validate.RegisterValidation("Alphanumericspaceunderhyphen", Alphanumericspaceunderhyphen)
 }
 
-func alphanumerspaceunderhyphen(fl validator.FieldLevel) bool {
+func Alphanumericspaceunderhyphen(fl validator.FieldLevel) bool {
 	str := fl.Field().String()
 	if str == "" {
 		return false
