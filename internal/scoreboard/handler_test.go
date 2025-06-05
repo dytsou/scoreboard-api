@@ -63,8 +63,17 @@ func TestValidateName(t *testing.T) {
 			validate := internal.NewValidator()
 			internal.RegisterCustomValidations(validate)
 			nameData := CreateScoreboardPayload{Name: tt.input}
-			if err := internal.ValidateStruct(validate, nameData); err != nil {
-				t.Errorf("validateName() gotErrMsg = %v, want %v", err, tt.wantErrMsg)
+			err := internal.ValidateStruct(validate, nameData)
+			if tt.wantValid {
+				if err != nil {
+					t.Errorf("validateName() unexpected error: %v, want no error", err)
+				}
+			} else {
+				if err == nil {
+					t.Errorf("validateName() expected error, got nil")
+				} else {
+					t.Errorf("validateName() expected error, got %v, want %v", err.Error(), tt.wantErrMsg)
+				}
 			}
 		})
 	}
