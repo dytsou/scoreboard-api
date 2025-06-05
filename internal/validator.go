@@ -18,10 +18,10 @@ func ValidateStruct(v *validator.Validate, s interface{}) error {
 	return nil
 }
 func RegisterCustomValidations(validate *validator.Validate) {
-	validate.RegisterValidation("Alphanumerspaceunderhyphen", Alphanumerspaceunderhyphen)
+	validate.RegisterValidation("Alphanumericspaceunderhyphen", Alphanumericspaceunderhyphen)
 }
 
-func Alphanumerspaceunderhyphen(fl validator.FieldLevel) bool {
+func Alphanumericspaceunderhyphen(fl validator.FieldLevel) bool {
 	str := fl.Field().String()
 	if str == "" {
 		return false
